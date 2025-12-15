@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>入力支援システム</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+</head>
+<body>
+    <!-- （テンプレート作成画面） -->
+    <div id="screen-B">
+        <div class="header-bar">
+             <div class="toolbar">
+                <button id="toolbar-text-btn" class="toolbar-btn">テキスト配置</button>
+                <div class="dropdown">
+                    <button id="toolbar-choice-btn" class="toolbar-btn">選択肢を配置 ▼</button>
+                    <div id="choice-dropdown" class="dropdown-content">
+                        <a href="#" data-choice-type="circle">丸</a>
+                        <a href="#" data-choice-type="check">チェック</a>
+                    </div>
+                </div>
+                <button id="toolbar-textarea-btn" class="toolbar-btn">文章欄</button>
+                <button id="toolbar-autofill-btn" class="toolbar-btn" title="他の項目から自動入力">自動判定</button>
+                <button id="toolbar-phone-group-btn" class="toolbar-btn" title="電話番号（自動分割）">電話番号</button>
+                <button id="toolbar-duplicate-group-btn" class="toolbar-btn" title="一度の入力で複数箇所に同じ値を反映">共通項目</button>
+                <!-- <button class="toolbar-btn" disabled>表ツール(開発中)</button> -->
+                <button id="toolbar-date-group-btn" class="toolbar-btn">日付グループ化</button>
+                <button id="toolbar-charsplit-group-btn" class="toolbar-btn">文字分割グループ化</button>
+             </div>
+        </div>
+       
+        <div id="floating-controls" class="floating-controls" style="display: none;">
+            <select id="floating-font-size">
+                <option value="8">8pt</option>
+                <option value="9">9pt</option>
+                <option value="10.5">10.5pt</option>
+                <option value="12">12pt</option>
+                <option value="14">14pt</option>
+                <option value="16">16pt</option>
+                <option value="18">18pt</option>
+                <option value="24">24pt</option>
+            </select>
+        </div>
+        <!-- 複製用矢印 -->
+        <div id="quick-duplicate-controls" class="quick-duplicate-controls" style="display: none;">
+            <button class="dup-btn dup-top" data-dir="top">↑</button>
+            <button class="dup-btn dup-right" data-dir="right">→</button>
+            <button class="dup-btn dup-bottom" data-dir="bottom">↓</button>
+            <button class="dup-btn dup-left" data-dir="left">←</button>
+        </div>
+        
+        <div class="main-container">
+            <div class="controls-column">
+                <div class="control-group">
+                    <h3>1. PDFファイルの選択</h3>
+                    <input type="file" id="pdfInput-B" accept=".pdf">
+                    <p id="fileName-B">PDFファイルをドラッグ＆ドロップまたは選択してください。</p>
+                    <p id="status-B"></p>
+                </div>
+                <div id="placementContainer-B">
+                    <div class="control-group" id="questionBuilder">
+                        <h3>質問の作成</h3>
+                        <div id="questions-list">
+                            <!-- 質問ブロックがここに追加されます -->
+                        </div>
+                        <button id="add-question-btn" style="width:100%">＋ 質問を追加</button>
+                    </div>
+                    <button id="saveTemplateBtn-B" class="mode-switch-btn" style="background-color: #17a2b8;">このテンプレートを保存</button>
+                    <input type="file" id="loadTemplateInput" accept=".json" style="display: none;">
+                    <button id="loadTemplateBtn" class="mode-switch-btn" style="background-color: #ff9800;">テンプレート読込</button>
+                    <button id="goToInputModeBtn-B" class="mode-switch-btn">入力プレビューへ進む →</button>
+                </div>
+                <div id="inputModeContainer-B" style="display: none;">
+                    <hr>
+                    <h3>入力プレビュー</h3>
+                    <form id="valueInputForm-B"></form>
+                    <button id="goToPlacementModeBtn-B" class="mode-switch-btn">← テンプレート編集に戻る</button>
+                </div>
+            </div>
+            <div class="canvas-column">
+                <div id="preview-B">
+                    <canvas id="pdfCanvas-B"></canvas>
+                </div>
+                <div class="control-group" id="preview-container-B" style="margin-top: 20px; width: 100%;">
+                    <h3>生成プレビュー</h3>
+                    <select id="fontSelect">
+                        <option value="NotoSansJP-Regular.ttf">(ゴシック体)</option>
+                        <option value="NotoSerifJP-Regular.otf">(明朝体)</option>
+                    </select>
+                    <button id="generatePdfBtn" style="width:100%; margin-top:10px;">PDF生成＆プレビュー</button>
+                    <iframe id="finalPdfPreview-B" style="width: 100%; height: 750px; border: 1px solid #ccc; margin-top:15px;"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="groupingModal" class="modal">
+      <div class="modal-content">
+          <span class="close-button">&times;</span>
+          <h3>フィールドのグループ化</h3>
+          
+          <div class="form-group">
+              <label for="groupNameInput">グループ名 (例: startTime, address)</label>
+              <input type="text" id="groupNameInput" placeholder="startTime">
+          </div>
+          <hr>
+          <div id="groupFieldsList">
+              </div>
+          <button id="saveGroupBtn">グループを保存</button>
+      </div>
+  </div>
+  <div id="autoFillModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <span class="close-button autofill-close">&times;</span>
+        <h3>自動入力ルールの設定</h3>
+        <p>「<span id="af-target-name" style="font-weight:bold;"></span>」の値を、他の項目に基づいて自動決定します。</p>
+        
+        <div class="form-group">
+            <label>判断基準にする項目（ソース）:</label>
+            <select id="af-source-select" style="width:100%; padding:8px;"></select>
+        </div>
+
+        <div class="form-group">
+            <label>判定ルール（前方一致）:</label>
+            <div id="af-rules-container" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+                </div>
+            <button id="af-add-rule-btn" style="font-size: 12px;">＋ ルールを追加</button>
+        </div>
+
+        <div style="text-align: right; margin-top: 20px;">
+            <button id="af-save-btn" class="primary-btn">設定を保存</button>
+        </div>
+    </div>
+</div>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+
