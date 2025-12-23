@@ -1185,26 +1185,115 @@ document.addEventListener("DOMContentLoaded", () => {
                     drawCanvasWithBoxes(); 
                 });
                 itemDiv.appendChild(label); itemDiv.appendChild(input);
-            } else if (item.type === 'question') {
-                const q = item.data; const label = document.createElement('label'); label.textContent = q.title; itemDiv.appendChild(label);
-                const optionsContainer = document.createElement('div'); optionsContainer.className = 'radio-group-container';
-                q.choices.forEach(c => {
-                    if (!c.fieldId || !c.name) return;
-                    const fieldData = fieldPositions[c.fieldId]; if (!fieldData) return;
-                    const wrapper = document.createElement('div');
-                    const input = document.createElement('input'); input.type = q.type; input.id = `input-${fieldData.id}`; input.name = q.id; input.checked = fieldData.value || false;
-                    input.addEventListener('change', (e) => {
-                        if (q.type === 'radio') q.choices.forEach(choice => { if (fieldPositions[choice.fieldId]) fieldPositions[choice.fieldId].value = false; });
-                        fieldData.value = e.target.checked; drawCanvasWithBoxes();
+            // 既存の updateValueInputForm 内の「else if (item.type === 'question')」ブロックを修正します
+    // 該当箇所を探して書き換えてください。
+
+    } else if (item.type === 'question') {
+        const q = item.data;
+        const label = document.createElement('label');
+        label.textContent = q.title;
+        label.style.fontWeight = "bold"; // 質問文を見やすく
+        itemDiv.appendChild(label);
+        
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = 'radio-group-container';
+        
+        q.choices.forEach(c => {
+            // 紐付けがない場合はスキップ（または表示だけする制御も可）
+            if (!c.fieldId || !c.name) return;
+            
+            const fieldData = fieldPositions[c.fieldId];
+            if (!fieldData) return;
+
+            const wrapper = document.createElement('div');
+            wrapper.style.marginBottom = "5px";
+            wrapper.style.display = "flex";
+            wrapper.style.alignItems = "center";
+
+            // ラジオ/チェックボックス
+            const input = document.createElement('input');
+            input.type = q.type; // radio or checkbox
+            input.id = `input-${fieldData.id}`;
+            input.name = q.id; // ラジオボタンのグループ化
+            input.checked = fieldData.value || false;
+
+            // ラベル
+            const optionLabel = document.createElement('label');
+            optionLabel.htmlFor = `input-${fieldData.id}`;
+            optionLabel.textContent = c.name;
+            optionLabel.style.marginLeft = "5px";
+            optionLabel.style.marginRight = "10px";
+
+            // --- ここが追加・変更点: テキスト入力との連動 ---
+            let textInput = null;
+            if (c.hasText && c.textFieldId) {
+                const textFieldData = fieldPositions[c.textFieldId];
+                if (textFieldData) {
+                    textInput = document.createElement('input');
+                    textInput.type = "text";
+                    textInput.placeholder = "詳細を入力...";
+                    textInput.value = textFieldData.value || '';
+                    textInput.style.flex = "1"; // 横幅いっぱいまで伸ばす
+                    textInput.style.border = "1px solid #ccc";
+                    textInput.style.borderRadius = "3px";
+                    textInput.style.padding = "2px 5px";
+
+                    // テキスト入力時のイベント
+                    textInput.addEventListener('input', (e) => {
+                        // 1. テキストデータの保存
+                        textFieldData.value = e.target.value;
+                        
+                        // 2. 文字が入力されたら、自動的にラジオ/チェックをONにする
+                        if (e.target.value.length > 0 && !input.checked) {
+                            input.checked = true;
+                            // ラジオなら他をOFFにする処理を呼ぶ
+                            input.dispatchEvent(new Event('change'));
+                        }
+                        drawCanvasWithBoxes();
                     });
-                    const optionLabel = document.createElement('label'); optionLabel.htmlFor = `input-${fieldData.id}`; optionLabel.textContent = c.name;
-                    wrapper.appendChild(input); wrapper.appendChild(optionLabel); optionsContainer.appendChild(wrapper);
-                });
-                itemDiv.appendChild(optionsContainer);
+                }
             }
-            valueInputForm.appendChild(itemDiv);
+
+            // ラジオ/チェックボックス変更時のイベント
+            input.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                
+                // ラジオボタンの場合、他の選択肢をOFFにする
+                if (q.type === 'radio' && isChecked) {
+                    q.choices.forEach(choice => {
+                        if (fieldPositions[choice.fieldId]) {
+                            // 自分以外をfalseに
+                            if (choice.fieldId !== c.fieldId) {
+                                fieldPositions[choice.fieldId].value = false;
+                            }
+                        }
+                    });
+                }
+                
+                // 自分の値を更新
+                fieldData.value = isChecked;
+
+                // チェックが外れたら、関連するテキスト入力もクリアするか？
+                // （ユーザー体験によるが、誤操作で消えると困るので今回はクリアしない。
+                //   ただし、フォーカスを当てるなどの親切設計はあり）
+                if (isChecked && textInput) {
+                    textInput.focus();
+                }
+
+                drawCanvasWithBoxes();
+            });
+
+            wrapper.appendChild(input);
+            wrapper.appendChild(optionLabel);
+            if (textInput) wrapper.appendChild(textInput); // テキスト入力があれば追加
+
+            optionsContainer.appendChild(wrapper);
         });
+        itemDiv.appendChild(optionsContainer);
     }
+    valueInputForm.appendChild(itemDiv); // 作成した要素をフォームに追加
+  }); // forEachの閉じ
+}
 
     function renderQuestionBlock(question) {
         const block = document.createElement('div'); block.className = 'question-block'; block.dataset.questionId = question.id;
@@ -1218,14 +1307,141 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     function renderChoiceItem(listContainer, question, choice) {
-        const item = document.createElement('div'); item.className = 'choice-item';
-        const unassignedSelector = createUnassignedSelector(choice.fieldId);
-        item.innerHTML = `<input type="text" class="choice-name" placeholder="選択肢名" value="${choice.name}">`; item.prepend(unassignedSelector);
+        // --- 全体の枠 ---
+        const item = document.createElement('div');
+        item.className = 'choice-item';
+        
+        // 基本スタイル（縦積みコンテナ）
+        item.style.display = "flex";
+        item.style.flexDirection = "column"; 
+        item.style.gap = "0";
+        item.style.marginBottom = "10px"; 
+        item.style.padding = "10px";
+        item.style.border = "1px solid #ddd"; 
+        item.style.borderRadius = "4px";
+        item.style.backgroundColor = "#fff";
+
+        // =========================================================
+        // [上段] 3つの要素を横一列に並べる (マーク | 名前 | チェック)
+        // =========================================================
+        const mainRow = document.createElement('div');
+        mainRow.style.display = "flex";
+        mainRow.style.alignItems = "center"; // 上下中央揃え
+        mainRow.style.gap = "8px";           // 要素間の隙間
+        mainRow.style.width = "100%";
+
+        // 1. マーク選択 (幅35%程度)
+        const markSelector = createUnassignedSelector(choice.fieldId);
+        markSelector.style.flex = "0 0 35%"; // 幅固定
+        markSelector.style.minWidth = "0";   // 縮小許容
+        markSelector.title = "マークする場所を選択"; // ホバー時にヒント表示
+
+        // 2. 選択肢名入力 (残り幅を埋める)
+        const nameInput = document.createElement('input');
+        nameInput.type = "text";
+        nameInput.className = "choice-name";
+        nameInput.placeholder = "選択肢名";
+        nameInput.value = choice.name;
+        nameInput.style.flex = "1";          // 伸縮自在
+        nameInput.style.minWidth = "0";
+        nameInput.style.boxSizing = "border-box";
+        // 高さをセレクトボックスに合わせる(約38px)
+        nameInput.style.height = "38px"; 
+        nameInput.style.padding = "5px";
+
+        // 3. テキストチェック (幅自動)
+        const checkboxContainer = document.createElement('div');
+        checkboxContainer.style.display = "flex";
+        checkboxContainer.style.alignItems = "center";
+        checkboxContainer.style.whiteSpace = "nowrap"; // 折り返し禁止
+
+        const hasTextCheckbox = document.createElement('input');
+        hasTextCheckbox.type = "checkbox";
+        hasTextCheckbox.id = `check_${Date.now()}_${Math.random()}`; 
+        hasTextCheckbox.checked = choice.hasText || false;
+        hasTextCheckbox.style.margin = "0 4px 0 0"; // 右に少し隙間
+        hasTextCheckbox.style.cursor = "pointer";
+
+        const hasTextLabel = document.createElement('label');
+        hasTextLabel.htmlFor = hasTextCheckbox.id;
+        hasTextLabel.textContent = "記入枠"; // スペース節約のため短縮
+        hasTextLabel.style.cursor = "pointer";
+        hasTextLabel.style.fontSize = "0.85em";
+        hasTextLabel.style.userSelect = "none";
+        hasTextLabel.title = "テキスト入力を伴う場合はチェック";
+
+        checkboxContainer.appendChild(hasTextCheckbox);
+        checkboxContainer.appendChild(hasTextLabel);
+
+        // 上段に追加
+        mainRow.appendChild(markSelector);
+        mainRow.appendChild(nameInput);
+        mainRow.appendChild(checkboxContainer);
+
+        // =========================================================
+        // [下段] 記入用枠の選択 (チェック時のみ表示)
+        // =========================================================
+        const selectorRow = document.createElement('div');
+        selectorRow.style.display = choice.hasText ? "flex" : "none"; 
+        selectorRow.style.alignItems = "center";
+        selectorRow.style.marginTop = "8px";
+        selectorRow.style.padding = "5px";
+        selectorRow.style.backgroundColor = "#f9f9f9"; // 背景色を少し変えて区別
+        selectorRow.style.borderRadius = "4px";
+
+        const selectorLabel = document.createElement('div');
+        selectorLabel.textContent = "↳ 記入用枠:";
+        selectorLabel.style.fontSize = "0.8em";
+        selectorLabel.style.color = "#666";
+        selectorLabel.style.marginRight = "10px";
+        selectorLabel.style.whiteSpace = "nowrap";
+
+        const textSelector = createUnassignedSelector(choice.textFieldId);
+        textSelector.style.flex = "1"; // 幅いっぱい
+
+        selectorRow.appendChild(selectorLabel);
+        selectorRow.appendChild(textSelector);
+
+        // =========================================================
+        // イベントリスナー
+        // =========================================================
+        nameInput.addEventListener('input', (e) => { 
+            choice.name = e.target.value; 
+            updateValueInputForm(); 
+        });
+
+        markSelector.addEventListener('change', (e) => { 
+            const oldFieldId = choice.fieldId; 
+            choice.fieldId = e.target.value || null; 
+            updateAllUnassignedSelectors(oldFieldId); 
+            updateValueInputForm(); 
+        });
+
+        textSelector.addEventListener('change', (e) => {
+            const oldId = choice.textFieldId;
+            choice.textFieldId = e.target.value || null;
+            updateAllUnassignedSelectors(oldId); 
+            updateValueInputForm();
+        });
+
+        hasTextCheckbox.addEventListener('change', (e) => {
+            choice.hasText = e.target.checked;
+            selectorRow.style.display = choice.hasText ? "flex" : "none";
+            if (!choice.hasText) {
+                choice.textFieldId = null;
+                textSelector.value = "";
+            }
+            updateValueInputForm();
+        });
+
+        // =========================================================
+        // DOMへの追加
+        // =========================================================
+        item.appendChild(mainRow);
+        item.appendChild(selectorRow);
+
         listContainer.appendChild(item);
-        item.querySelector('.choice-name').addEventListener('input', (e) => { choice.name = e.target.value; updateValueInputForm(); });
-        unassignedSelector.addEventListener('change', (e) => { const oldFieldId = choice.fieldId; choice.fieldId = e.target.value || null; updateAllUnassignedSelectors(oldFieldId); updateValueInputForm(); });
     }
-    
     function createUnassignedSelector(selectedFieldId) {
         const select = document.createElement('select'); select.innerHTML = '<option value="">-- 要素を選択 --</option>';
         const assignedFieldIds = new Set(); questions.forEach(q => q.choices.forEach(c => { if (c.fieldId && c.fieldId !== selectedFieldId) assignedFieldIds.add(c.fieldId); }));
